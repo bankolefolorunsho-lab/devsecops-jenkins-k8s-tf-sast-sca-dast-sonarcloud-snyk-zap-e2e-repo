@@ -1,65 +1,65 @@
 pipeline {
-  agent any
-  tools { 
-        maven 'Maven_3_5_2'  
+    agent any
+    tools {
+        maven 'Maven_3_8_4'
     }
-   stages{
-    stage('CompileandRunSonarAnalysis') {
-            steps {	
-		sh 'mvn clean verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=testoneado -Dsonar.organization=testoneado -Dsonar.host.url=https://sonarcloud.io -Dsonar.token=0716ab3bd8d2d91a743a49cb07f61546fadbfcf3'
-			}
-    }
-
-	stage('RunSCAAnalysisUsingSnyk') {
-            steps {		
-				withCredentials([string(credentialsId: 'SNYK_TOKEN', variable: 'SNYK_TOKEN')]) {
-					sh 'mvn snyk:test -fn'
-				}
-			}
-    }
-
-	stage('Build') { 
-            steps { 
-               withDockerRegistry([credentialsId: "dockerlogin", url: ""]) {
-                 script{
-                 app =  docker.build("asg")
-                 }
-               }
-            }
-    }
-
-	stage('Push') {
+    stages {
+        stage('CompileandRunSonarAnalysis') {
             steps {
-                script{
-                    docker.withRegistry('https://429128461530.dkr.ecr.us-east-1.amazonaws.com', 'ecr:us-east-1:aws-credentials') {
-                    app.push("latest")
+                sh 'mvn clean verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=captainbanks_captainbanks -Dsonar.organization=captainbanks -Dsonar.host.url=https://sonarcloud.io -Dsonar.token=a7cc86c2e8571e575855af67e2bd7eb3c718e878'
+            }
+        }
+
+        stage('RunSCAAnalysisUsingSnyk') {
+            steps {
+                withCredentials([string(credentialsId: 'SNYK_TOKEN', variable: 'SNYK_TOKEN')]) {
+                    sh 'mvn snyk:test -fn'
+                }
+            }
+        }
+
+        stage('Build') {
+            steps {
+                withDockerRegistry([credentialsId: "dockerlogin", url: ""]) {
+                    script {
+                        app = docker.build("asg")
                     }
                 }
             }
-    	}
-	   
-	stage('Kubernetes Deployment of ASG Bugg Web Application') {
-	   steps {
-	      withKubeConfig([credentialsId: 'kubelogin']) {
-		  sh('kubectl delete all --all -n devsecops')
-		  sh ('kubectl apply -f deployment.yaml --namespace=devsecops')
-		}
-	      }
-   	}
-	   
-	stage ('wait_for_testing'){
-	   steps {
-		   sh 'pwd; sleep 180; echo "Application Has been deployed on K8S"'
-	   	}
-	   }
-	   
-	stage('RunDASTUsingZAP') {
-          steps {
-		    withKubeConfig([credentialsId: 'kubelogin']) {
-				sh('zap.sh -cmd -quickurl http://$(kubectl get services/asgbuggy --namespace=devsecops -o json| jq -r ".status.loadBalancer.ingress[] | .hostname") -quickprogress -quickout ${WORKSPACE}/zap_report.html')
-				archiveArtifacts artifacts: 'zap_report.html'
-		    }
-	     }
-       } 
-  }
+        }
+
+        stage('Push') {
+            steps {
+                script {
+                    docker.withRegistry('https://051370879805.dkr.ecr.us-east-1.amazonaws.com', 'ecr:us-east-1:aws-credentials') {
+                        app.push("latest")
+                    }
+                }
+            }
+        }
+
+        stage('Kubernetes Deployment of ASG Bugg Web Application') {
+            steps {
+                withKubeConfig([credentialsId: 'kubelogin']) {
+                    sh('kubectl delete all --all -n devsecops')
+                    sh('kubectl apply -f deployment.yaml --namespace=devsecops')
+                }
+            }
+        }
+
+        stage('wait_for_testing') {
+            steps {
+                sh 'pwd; sleep 180; echo "Application Has been deployed on K8S"'
+            }
+        }
+
+        stage('RunDASTUsingZAP') {
+            steps {
+                withKubeConfig([credentialsId: 'kubelogin']) {
+                    sh('zap.sh -cmd -quickurl http://$(kubectl get services/asgbanky --namespace=devsecops -o json| jq -r ".status.loadBalancer.ingress[] | .hostname") -quickprogress -quickout ${WORKSPACE}/zap_report.html')
+                    archiveArtifacts artifacts: 'zap_report.html'
+                }
+            }
+        }
+    }
 }
